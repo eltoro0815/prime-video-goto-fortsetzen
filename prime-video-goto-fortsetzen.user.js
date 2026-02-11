@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Prime Video - Fortsetzen-Kategorie nach oben verschieben
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      3.0
 // @description  Verschiebt die "Fortsetzen"-Kategorie auf Amazon Prime Video an die erste Position direkt nach der Navigation
 // @author       You
 // @match        https://www.amazon.de/gp/video/storefront*
@@ -18,7 +18,7 @@
         const checkExist = setInterval(function() {
             try {
                 // 1. Finde die Fortsetzen-Sektion direkt
-                const fortsetzenTitel = Array.from(document.querySelectorAll('span[data-testid="carousel-title"] p'))
+                const fortsetzenTitel = Array.from(document.querySelectorAll('span[data-testid="carousel-title"]'))
                     .find(el => el.textContent.trim() === 'Fortsetzen');
                 
                 if (!fortsetzenTitel) {
