@@ -1,129 +1,102 @@
 // ==UserScript==
-// @name         Amazon Prime Video - Fortsetzen-Kategorie nach oben verschieben
+// @name         Prime Video → Fortsetzen (v2)
 // @namespace    http://tampermonkey.net/
-// @version      3.0
-// @description  Verschiebt die "Fortsetzen"-Kategorie auf Amazon Prime Video an die erste Position direkt nach der Navigation
-// @author       You
-// @match        https://www.amazon.de/gp/video/storefront*
+// @version      4.0
+// @description  Scrollt automatisch zum „Fortsetzen“-Karussell auf der Prime-Video-Startseite
+// @match        *://*.amazon.de/gp/video/storefront*
+// @match        *://amazon.de/gp/video/storefront*
+// @include      /^https?:\/\/([^/]+\.)?amazon\.[a-z.]+\/gp\/video\/storefront(\/|$|\?)/
+// @match        *://*.primevideo.com/*/storefront*
+// @match        *://primevideo.com/*/storefront*
 // @grant        none
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+  'use strict';
 
-    // Funktion zum Verschieben der Fortsetzen-Kategorie
-    function verschiebeFortsetztenKategorie() {
-        // Warte auf das Laden der Seite und der Kategorien
-        const checkExist = setInterval(function() {
-            try {
-                // 1. Finde die Fortsetzen-Sektion direkt
-                const fortsetzenTitel = Array.from(document.querySelectorAll('span[data-testid="carousel-title"]'))
-                    .find(el => el.textContent.trim() === 'Fortsetzen');
-                
-                if (!fortsetzenTitel) {
-                    // Fortsetzen-Titel nicht gefunden
-                    return;
-                }
-                
-                console.log('Fortsetzen-Kategorie gefunden');
-                
-                // 2. Von diesem Titel ausgehend, navigieren wir nach oben, um den richtigen Container zu finden
-                let fortsetzenKarussell = fortsetzenTitel.closest('section[data-testid="standard-carousel"]');
-                if (!fortsetzenKarussell) {
-                    console.log('Fortsetzen-Karussell nicht gefunden');
-                    return;
-                }
-                
-                // 3. Wir müssen den Container auf der richtigen Ebene finden
-                // Das ist die Ebene, auf der auch der top-hero Container ist
-                let fortsetzenContainer = fortsetzenKarussell;
-                let topHeroContainer = document.querySelector('div[data-testid="top-hero"]');
-                
-                if (!topHeroContainer) {
-                    console.log('Top-Hero-Container nicht gefunden');
-                    return;
-                }
-                
-                // Navigiere die DOM-Hierarchie nach oben, bis wir auf der gleichen Ebene wie der top-hero Container sind
-                while (fortsetzenContainer && fortsetzenContainer.parentElement && 
-                       !fortsetzenContainer.parentElement.contains(topHeroContainer)) {
-                    fortsetzenContainer = fortsetzenContainer.parentElement;
-                }
-                
-                // 4. Jetzt finden wir den Container, der sowohl den top-hero als auch unseren Container enthält
-                const commonParent = topHeroContainer.parentElement;
-                
-                if (!commonParent) {
-                    console.log('Gemeinsamer Eltern-Container nicht gefunden');
-                    return;
-                }
-                
-                // Prüfe, ob der Fortsetzen-Container bereits direkt nach dem Top-Hero ist
-                const currentIndex = Array.from(commonParent.children).indexOf(fortsetzenContainer);
-                const topHeroIndex = Array.from(commonParent.children).indexOf(topHeroContainer);
-                
-                if (currentIndex === topHeroIndex + 1) {
-                    console.log('Fortsetzen-Kategorie ist bereits an der richtigen Position');
-                    clearInterval(checkExist);
-                    return;
-                }
-                
-                // 5. Entferne den Fortsetzen-Container und füge ihn nach dem top-hero ein
-                const clone = fortsetzenContainer.cloneNode(true);
-                commonParent.removeChild(fortsetzenContainer);
-                
-                // Füge den Container direkt nach dem top-hero ein
-                if (topHeroContainer.nextSibling) {
-                    commonParent.insertBefore(clone, topHeroContainer.nextSibling);
-                } else {
-                    commonParent.appendChild(clone);
-                }
-                
-                console.log('Fortsetzen-Kategorie erfolgreich unter dem Top-Hero platziert!');
-                
-                // Scrollen zur richtigen Position
-                setTimeout(() => {
-                    const topHeroBottom = topHeroContainer.getBoundingClientRect().bottom;
-                    window.scrollTo({top: topHeroBottom - 100, behavior: 'smooth'});
-                    console.log(`Gescrollt zu Position ${topHeroBottom}px`);
-                }, 500);
-                
-                clearInterval(checkExist);
-                
-            } catch (error) {
-                console.error('Fehler beim Verschieben der Fortsetzen-Kategorie:', error);
-            }
-        }, 1000);
-        
-        // Setze Timeout nach 30 Sekunden
-        setTimeout(function() {
-            clearInterval(checkExist);
-            console.log('Zeitlimit überschritten.');
-        }, 30000);
+  // Sicherheitsnetz: nur auf der Startseite ausführen
+  const isStorefront =
+    /\/gp\/video\/storefront(\/|$|\?)/.test(location.pathname) ||
+    /\/storefront(\/|$|\?)/.test(location.pathname);
+
+  if (!isStorefront) return;
+
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
+  const TITLES = /^(Fortsetzen|Continue watching|Zuletzt angesehen|Recently watched)/i;
+  const MAX_MS = 45000;
+  const start = Date.now();
+  let done = false;
+  let lastY = -1;
+  let stableCount = 0;
+  let observer = null;
+
+  function findTarget() {
+    for (const title of document.querySelectorAll('[data-testid="carousel-title"]')) {
+      if (TITLES.test(title.textContent.trim())) {
+        return (
+          title.closest('[data-testid="standard-carousel"]') ||
+          title.closest('[data-testid="navigation-carousel-wrapper"]') ||
+          title.closest('section')
+        );
+      }
+    }
+    return null;
+  }
+
+  function scrollToTarget() {
+    const el = findTarget();
+    if (!el) return false;
+
+    const y = el.getBoundingClientRect().top + window.scrollY - 80;
+    window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+
+    const currentY = window.scrollY;
+    if (Math.abs(currentY - lastY) < 5) {
+      stableCount++;
+    } else {
+      stableCount = 0;
+    }
+    lastY = currentY;
+
+    if (stableCount >= 3) {
+      done = true;
+      if (observer) observer.disconnect();
+    }
+    return true;
+  }
+
+  function tick() {
+    if (done || Date.now() - start > MAX_MS) return;
+
+    const found = scrollToTarget();
+    if (!found) {
+      window.scrollBy({ top: 600, behavior: 'instant' });
     }
 
-    // Führe die Funktion aus, wenn die Seite geladen ist
-    window.addEventListener('load', verschiebeFortsetztenKategorie);
-    
-    // Alternative Ausführung, falls das Load-Event bereits ausgelöst wurde
-    if (document.readyState === 'complete') {
-        setTimeout(verschiebeFortsetztenKategorie, 1000);
+    requestAnimationFrame(tick);
+  }
+
+  observer = new MutationObserver(() => {
+    if (!done) scrollToTarget();
+  });
+
+  function startObserver() {
+    if (document.documentElement) {
+      observer.observe(document.documentElement, { childList: true, subtree: true });
     }
-    
-    // Bei dynamischen Seitenänderungen erneut prüfen
-    const observer = new MutationObserver(function(mutations) {
-        for (const mutation of mutations) {
-            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                setTimeout(verschiebeFortsetztenKategorie, 1000);
-                break;
-            }
-        }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      startObserver();
+      requestAnimationFrame(tick);
     });
-    
-    // Beobachte das body-Element für Änderungen
-    setTimeout(function() {
-        observer.observe(document.body, { childList: true, subtree: true });
-        console.log('Observer installiert auf body-Element.');
-    }, 2000);
-})(); 
+  } else {
+    startObserver();
+    requestAnimationFrame(tick);
+  }
+})();
