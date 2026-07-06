@@ -1,8 +1,13 @@
 // ==UserScript==
-// @name         Prime Video → Fortsetzen (v2)
-// @namespace    http://tampermonkey.net/
-// @version      4.0
+// @name         Prime Video → Fortsetzen
+// @namespace    https://github.com/eltoro0815/prime-video-goto-fortsetzen
+// @version      4.1
 // @description  Scrollt automatisch zum „Fortsetzen“-Karussell auf der Prime-Video-Startseite
+// @author       eltoro0815
+// @homepageURL  https://github.com/eltoro0815/prime-video-goto-fortsetzen
+// @supportURL   https://github.com/eltoro0815/prime-video-goto-fortsetzen/issues
+// @updateURL    https://raw.githubusercontent.com/eltoro0815/prime-video-goto-fortsetzen/main/prime-video-goto-fortsetzen.user.js
+// @downloadURL  https://raw.githubusercontent.com/eltoro0815/prime-video-goto-fortsetzen/main/prime-video-goto-fortsetzen.user.js
 // @match        *://*.amazon.de/gp/video/storefront*
 // @match        *://amazon.de/gp/video/storefront*
 // @include      /^https?:\/\/([^/]+\.)?amazon\.[a-z.]+\/gp\/video\/storefront(\/|$|\?)/
